@@ -1,0 +1,9 @@
+{
+  "name": "Gemini Omni-Workspace",
+  "description": "A professional-grade multimodal AI workspace featuring real-time voice interaction (Live API), cinematic video generation (Veo), advanced image synthesis, and grounded research capabilities.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
