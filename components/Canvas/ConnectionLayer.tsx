@@ -13,65 +13,75 @@ const ConnectionLayer: React.FC<ConnectionLayerProps> = ({ nodes, edges, content
   const [paths, setPaths] = useState<{ id: string, d: string, isHighlighted: boolean, isDimmed: boolean }[]>([]);
 
   useEffect(() => {
-    // Recalculate paths whenever nodes move, edges change, or viewport updates
-    const newPaths = edges.map(edge => {
-        const fromNode = nodes.find(n => n.id === edge.fromNode);
-        const toNode = nodes.find(n => n.id === edge.toNode);
-        
-        // If either node is missing (e.g. deleted), skip rendering
-        if (!fromNode || !toNode) return null;
-
-        // Highlighting Logic
-        const isHighlighted = hoveredNodeId === edge.toNode || hoveredNodeId === edge.fromNode;
-        // If something is hovered but it's not this edge, dim it
-        const isDimmed = hoveredNodeId !== null && !isHighlighted;
-
-        // Default Anchor: Center-Right of Source Node
-        let startX = fromNode.x + fromNode.width;
-        let startY = fromNode.y + (fromNode.height / 2);
-
-        // Precise Anchor: Specific Message Bubble
-        if (edge.fromMessageId) {
-            const msgEl = document.getElementById(`msg-${fromNode.id}-${edge.fromMessageId}`);
+    const calculatePaths = () => {
+        // Recalculate paths whenever nodes move, edges change, or viewport updates
+        const newPaths = edges.map(edge => {
+            const fromNode = nodes.find(n => n.id === edge.fromNode);
+            const toNode = nodes.find(n => n.id === edge.toNode);
             
-            // Check if element exists and is actually rendered (visible)
-            // Virtualized nodes (display: none) will have 0 width/height
-            if (msgEl && contentRef.current) {
-                const msgRect = msgEl.getBoundingClientRect();
+            // If either node is missing (e.g. deleted), skip rendering
+            if (!fromNode || !toNode) return null;
+
+            // Highlighting Logic
+            const isHighlighted = hoveredNodeId === edge.toNode || hoveredNodeId === edge.fromNode;
+            // If something is hovered but it's not this edge, dim it
+            const isDimmed = hoveredNodeId !== null && !isHighlighted;
+
+            // Default Anchor: Center-Right of Source Node
+            let startX = fromNode.x + fromNode.width;
+            let startY = fromNode.y + (fromNode.height / 2);
+
+            // Precise Anchor: Specific Message Bubble
+            if (edge.fromMessageId) {
+                const msgEl = document.getElementById(`msg-${fromNode.id}-${edge.fromMessageId}`);
                 
-                if (msgRect.width > 0 && msgRect.height > 0) {
-                     const contentRect = contentRef.current.getBoundingClientRect();
-                     const scale = viewport.zoom;
-                     
-                     // Convert Screen Coordinates back to Canvas Local Coordinates
-                     startX = (msgRect.right - contentRect.left) / scale;
-                     startY = (msgRect.top - contentRect.top + (msgRect.height / 2)) / scale;
+                // Check if element exists and is actually rendered (visible)
+                // Virtualized nodes (display: none) will have 0 width/height
+                if (msgEl && contentRef.current) {
+                    const msgRect = msgEl.getBoundingClientRect();
+                    
+                    if (msgRect.width > 0 && msgRect.height > 0) {
+                        const contentRect = contentRef.current.getBoundingClientRect();
+                        const scale = viewport.zoom;
+                        
+                        // Convert Screen Coordinates back to Canvas Local Coordinates
+                        startX = (msgRect.right - contentRect.left) / scale;
+                        startY = (msgRect.top - contentRect.top + (msgRect.height / 2)) / scale;
+                    }
                 }
             }
-        }
 
-        // Target Anchor: Top-Left Header area of Target Node
-        const endX = toNode.x;
-        const endY = toNode.y + 28; // Approx center of header height
+            // Target Anchor: Top-Left Header area of Target Node
+            const endX = toNode.x;
+            const endY = toNode.y + 28; // Approx center of header height
 
-        // Calculate Bezier Control Points for smooth S-curve
-        const dist = Math.abs(endX - startX);
-        const controlOffset = Math.min(dist * 0.5, 150); // Cap the curve depth
+            // Calculate Bezier Control Points for smooth S-curve
+            const dist = Math.abs(endX - startX);
+            const controlOffset = Math.min(dist * 0.5, 150); // Cap the curve depth
 
-        const cp1x = startX + controlOffset;
-        const cp1y = startY;
-        const cp2x = endX - controlOffset;
-        const cp2y = endY;
+            const cp1x = startX + controlOffset;
+            const cp1y = startY;
+            const cp2x = endX - controlOffset;
+            const cp2y = endY;
 
-        return {
-            id: edge.id,
-            d: `M ${startX} ${startY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${endX} ${endY}`,
-            isHighlighted,
-            isDimmed
-        };
-    }).filter(Boolean) as { id: string, d: string, isHighlighted: boolean, isDimmed: boolean }[];
+            return {
+                id: edge.id,
+                d: `M ${startX} ${startY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${endX} ${endY}`,
+                isHighlighted,
+                isDimmed
+            };
+        }).filter(Boolean) as { id: string, d: string, isHighlighted: boolean, isDimmed: boolean }[];
 
-    setPaths(newPaths);
+        setPaths(newPaths);
+    };
+
+    // Initial Calculation
+    calculatePaths();
+
+    // Secondary calculation to catch layout updates after render
+    const timer = setTimeout(calculatePaths, 50);
+
+    return () => clearTimeout(timer);
   }, [nodes, edges, viewport, contentRef, hoveredNodeId]);
 
   return (
@@ -79,13 +89,13 @@ const ConnectionLayer: React.FC<ConnectionLayerProps> = ({ nodes, edges, content
       <style>
         {`
           @keyframes drawLine {
-            from { stroke-dashoffset: 1; }
-            to { stroke-dashoffset: 0; }
+            from { stroke-dashoffset: 1; opacity: 0; }
+            to { stroke-dashoffset: 0; opacity: 1; }
           }
           .animate-draw {
             stroke-dasharray: 1;
             stroke-dashoffset: 1;
-            animation: drawLine 0.8s ease-out forwards;
+            animation: drawLine 1s ease-out forwards;
           }
         `}
       </style>

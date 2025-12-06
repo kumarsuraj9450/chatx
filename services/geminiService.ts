@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { MODELS, CHAT_MODES } from "../constants";
+import { Attachment } from "../types";
 
 // Helper to ensure API Key is present
 const getClient = () => {
@@ -13,15 +14,14 @@ export const streamChatResponse = async (
   history: { role: string; parts: { text: string }[] }[],
   message: string,
   mode: 'standard' | 'thinking' | 'image',
-  modelNameOverride: string | undefined, // New parameter
+  modelNameOverride: string | undefined,
   systemInstruction: string,
-  images: string[] = [],
+  attachments: Attachment[] = [],
   onChunk: (text: string, image?: string) => void
 ) => {
   const ai = getClient();
   
   // 1. Determine base model from Mode or Override
-  // Default to mode's default if override is not provided
   let modelName = modelNameOverride || CHAT_MODES.STANDARD.model;
   
   if (!modelNameOverride) {
@@ -35,24 +35,26 @@ export const streamChatResponse = async (
   };
 
   if (mode === 'thinking') {
-    // Only apply thinking budget if the selected model supports it? 
-    // For now we assume if mode is thinking, we want thinking config.
     config.thinkingConfig = { thinkingBudget: CHAT_MODES.THINKING.thinkingBudget };
   } 
   
-  // Note: Image mode usually implies a specific model (nano banana), but if overridden, we just proceed.
-
   const chat = ai.chats.create({
     model: modelName, 
     history: history,
     config: config
   });
 
-  // Construct message with optional images (inputs)
+  // Construct message with optional attachments (multimodal inputs)
   let msgContent: any = message;
-  if (images.length > 0) {
+  
+  if (attachments.length > 0) {
      msgContent = [
-       ...images.map(img => ({ inlineData: { mimeType: 'image/png', data: img } })),
+       ...attachments.map(att => ({ 
+           inlineData: { 
+               mimeType: att.mimeType, 
+               data: att.data 
+           } 
+       })),
        { text: message }
      ];
   }
@@ -66,7 +68,6 @@ export const streamChatResponse = async (
     }
     
     // 2. Generated Images (for Image Mode)
-    // The API might return inlineData in the parts
     const parts = chunk.candidates?.[0]?.content?.parts;
     if (parts) {
       for (const part of parts) {
@@ -82,14 +83,13 @@ export const streamChatResponse = async (
 // --- IMAGE ---
 export const generateImage = async (prompt: string, aspectRatio: string = "1:1", size: string = "1K") => {
   const ai = getClient();
-  // gemini-2.5-flash-image does not support imageSize parameter, only aspectRatio.
+  // gemini-2.5-flash-image does not support imageSize parameter
   const response = await ai.models.generateContent({
     model: MODELS.IMAGE_GEN, 
     contents: { parts: [{ text: prompt }] },
     config: {
       imageConfig: {
         aspectRatio: aspectRatio,
-        // imageSize: size // Removed to fix [original: beyond::dependency::3] error
       }
     }
   });

@@ -413,7 +413,7 @@ const CanvasBoard: React.FC<CanvasBoardProps> = ({ initialData, onSave, theme })
 
       <div 
         ref={contentRef}
-        className="absolute origin-top-left transition-transform duration-75 ease-out"
+        className="absolute top-0 left-0 w-full h-full origin-top-left transition-transform duration-75 ease-out pointer-events-none"
         style={{
             transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`
         }}

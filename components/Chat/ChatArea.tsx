@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Image as ImageIcon, Loader2, Bot, User } from 'lucide-react';
-import { ChatMessage } from '../../types';
+import { ChatMessage, Attachment } from '../../types';
 import { streamChatResponse } from '../../services/geminiService';
 import { blobToBase64 } from '../../utils/audioUtils';
 import { SYSTEM_PROMPTS } from '../../constants';
@@ -33,25 +33,37 @@ const ChatArea: React.FC = () => {
   const handleSend = async () => {
     if ((!input.trim() && !selectedImage) || isLoading) return;
 
+    // Prepare attachments for UI state
+    const uiAttachments: Attachment[] | undefined = previewUrl ? [{
+        type: 'image',
+        mimeType: selectedImage?.type || 'image/png',
+        data: '', // Base64 not strictly needed for local preview
+        url: previewUrl
+    }] : undefined;
+
     const userMsgId = Date.now().toString();
     const newUserMsg: ChatMessage = {
       id: userMsgId,
       role: 'user',
       text: input,
       timestamp: Date.now(),
-      images: previewUrl ? [previewUrl] : undefined // Just for UI display
+      attachments: uiAttachments
     };
 
     setMessages(prev => [...prev, newUserMsg]);
     setInput('');
     setIsLoading(true);
 
-    // Prepare image for API if exists
-    const apiImages: string[] = [];
+    // Prepare attachments for API
+    const apiAttachments: Attachment[] = [];
     if (selectedImage) {
         try {
             const b64 = await blobToBase64(selectedImage);
-            apiImages.push(b64);
+            apiAttachments.push({
+                type: 'image',
+                mimeType: selectedImage.type,
+                data: b64
+            });
         } catch (e) {
             console.error("Failed to convert image", e);
         }
@@ -85,7 +97,7 @@ const ChatArea: React.FC = () => {
             'thinking',
             undefined,
             SYSTEM_PROMPTS.STANDARD,
-            apiImages,
+            apiAttachments,
             (chunk) => {
                 accumulatedText += chunk;
                 setMessages(prev => prev.map(m => 
@@ -148,8 +160,10 @@ const ChatArea: React.FC = () => {
                         : 'bg-slate-800 border border-slate-700 text-slate-200 rounded-tl-none'
                     } ${msg.isError ? 'border-red-500/50 bg-red-900/10' : ''}`}
                 >
-                    {msg.images && msg.images.map((img, idx) => (
-                        <img key={idx} src={img} alt="User upload" className="max-w-xs rounded-lg mb-3 border border-white/10" />
+                    {msg.attachments && msg.attachments.map((att, idx) => (
+                        att.type === 'image' && att.url ? (
+                            <img key={idx} src={att.url} alt="User upload" className="max-w-xs rounded-lg mb-3 border border-white/10" />
+                        ) : null
                     ))}
                     <div className="whitespace-pre-wrap leading-relaxed">
                         {msg.text || (isLoading && msg.id === messages[messages.length - 1].id ? <span className="animate-pulse">Thinking...</span> : '')}

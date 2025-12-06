@@ -7,11 +7,19 @@ export enum ViewMode {
   SETTINGS = 'SETTINGS'
 }
 
+export interface Attachment {
+  type: 'image' | 'file';
+  mimeType: string;
+  data: string; // Base64 string (raw)
+  name?: string;
+  url?: string; // For UI display (blob URL)
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'model';
   text: string;
-  images?: string[]; // base64
+  attachments?: Attachment[];
   timestamp: number;
   isError?: boolean;
 }
